@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - '*'  # ✅ Fixed: Combined tags inside push
+      - '*'  # ✅ Runs on all tag pushes
 
 jobs:
   build:
@@ -21,9 +21,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Authenticate with AWS ECR (Using GitHub Action)
-        uses: aws-actions/amazon-ecr-login@v1
-
       - name: Set Image Tag Version
         id: vars
         run: |
@@ -34,32 +31,35 @@ jobs:
             TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
             echo "RELEASE_VERSION=$BRANCH_NAME-$TIMESTAMP" >> $GITHUB_ENV
           fi
-          echo "Release Version: ${{ env.RELEASE_VERSION }}"
+          echo "🟢 Image tag version: ${{ env.RELEASE_VERSION }}"
+
+      - name: Authenticate with AWS ECR
+        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Ensure ECR Repository Exists
         run: |
           if ! aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }} >/dev/null 2>&1; then
             aws ecr create-repository --repository-name "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }}
-            echo "ECR repository created successfully!"
+            echo "✅ ECR repository created successfully!"
           else
-            echo "ECR repository already exists."
+            echo "✅ ECR repository already exists."
           fi
 
       - name: Build Docker Image
         run: |
           IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
-          echo "Building Docker Image with tag: $IMAGE_TAG"
+          echo "🚀 Building Docker Image with tag: $IMAGE_TAG"
           docker build -t "$IMAGE_TAG" .
 
       - name: Push Docker Image to AWS ECR
         run: |
           IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
-          echo "Pushing Docker Image: $IMAGE_TAG"
+          echo "📤 Pushing Docker Image: $IMAGE_TAG"
           docker push "$IMAGE_TAG"
 
   security_scan:
     runs-on: ubuntu-latest
-    needs: build  # ✅ Trivy runs after the build job is successful
+    needs: build  # ✅ Ensures the image exists before scanning
     steps:
       - name: Configure AWS Credentials for Trivy
         uses: aws-actions/configure-aws-credentials@v1
@@ -70,6 +70,11 @@ jobs:
 
       - name: Authenticate with AWS ECR for Trivy Scan
         uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Debug: List Images in AWS ECR
+        run: |
+          echo "🔍 Checking if the image exists in AWS ECR..."
+          aws ecr list-images --repository-name "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }}
 
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
