@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-  push:
     tags:
-      - '*'  # ✅ Fixed: Now properly formatted under `on: push`
+      - '*'  # ✅ Fixed: Combined tags inside push
 
 jobs:
   build:
