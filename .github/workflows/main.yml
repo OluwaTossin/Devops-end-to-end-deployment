@@ -71,7 +71,7 @@ jobs:
       - name: Authenticate with AWS ECR for Trivy Scan
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Debug: List Images in AWS ECR
+      - name: Debug - List Images in AWS ECR
         run: |
           echo "🔍 Checking if the image exists in AWS ECR..."
           aws ecr list-images --repository-name "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }}
