@@ -1,11 +1,11 @@
-name: CI/CD Pipeline with AWS ECR, Trivy Scan, and Terraform Deployment
+name: CI/CD Pipeline with AWS ECR, Trivy Scan, and Deployment
 
 on:
   push:
     branches:
-      - main  # Triggers on any push to the main branch
+      - main
     tags:
-      - '*'   # Triggers on any tag push
+      - '*'
 
 jobs:
   build:
@@ -13,6 +13,13 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set Release version
         id: vars
@@ -22,10 +29,6 @@ jobs:
       - name: Authenticate with AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Ensure ECR Repository Exists
         run: |
@@ -60,9 +63,3 @@ jobs:
           echo "Release Version: ${{ env.RELEASE_VERSION }}"
           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-
-      - name: Terraform Initialization
-        run: cd devops/ && terraform init 
-
-      - name: Terraform Deployment
-        run: cd devops/ && terraform apply -var="tag=${{ env.RELEASE_VERSION }}" -auto-approve
