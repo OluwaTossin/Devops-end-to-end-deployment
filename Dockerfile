@@ -1,18 +1,17 @@
-# Use an official base image
-FROM node:18
+# Use Nginx as the base image
+FROM nginx:alpine
 
 # Set the working directory
-WORKDIR /app
+WORKDIR /usr/share/nginx/html
 
-# Copy package.json and install dependencies
-COPY package.json package-lock.json ./
-RUN npm install --only=production
+# Remove default index.html
+RUN rm -rf ./*
 
-# Copy application files
+# Copy all HTML, CSS, and assets to the web server directory
 COPY . .
 
-# Expose port
-EXPOSE 3000
+# Expose port 80
+EXPOSE 80
 
-# Command to start the app
-CMD ["node", "server.js"]
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
