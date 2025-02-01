@@ -52,21 +52,23 @@ jobs:
           echo "Building Docker Image with tag: $IMAGE_TAG"
           docker build -t "$IMAGE_TAG" .
 
-      - name: Install Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-          trivy --version
-
-      - name: Scan Docker Image with Trivy (Log Only, Do Not Fail Build)
-        run: |
-          echo "Running security scan, logging vulnerabilities but continuing."
-          trivy image --severity CRITICAL,HIGH ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }} || true
-
       - name: Push Docker Image to AWS ECR
         run: |
           IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
           echo "Pushing Docker Image: $IMAGE_TAG"
           docker push "$IMAGE_TAG"
+
+  security_scan:
+    runs-on: ubuntu-latest
+    needs: build  # ✅ Trivy runs after the build job is successful
+    steps:
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          format: "table"
 
       - name: Check tag version
         run: | 
