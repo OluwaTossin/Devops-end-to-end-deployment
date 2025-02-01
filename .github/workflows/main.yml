@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
-  tags:
-    - '*'  # Runs on all tag pushes
+  push:
+    tags:
+      - '*'  # ✅ Fixed: Now properly formatted under `on: push`
 
 jobs:
   build:
@@ -28,7 +29,8 @@ jobs:
             echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
             BRANCH_NAME=$(echo "${{ github.ref_name }}" | tr '/' '-')
-            echo "RELEASE_VERSION=$BRANCH_NAME" >> $GITHUB_ENV
+            TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+            echo "RELEASE_VERSION=$BRANCH_NAME-$TIMESTAMP" >> $GITHUB_ENV
           fi
           echo "Release Version: ${{ env.RELEASE_VERSION }}"
 
