@@ -2,8 +2,10 @@ name: CI/CD Pipeline with AWS ECR, Trivy Scan, and Terraform Deployment
 
 on:
   push:
+    branches:
+      - main  # Triggers on any push to the main branch
     tags:
-      - '*'
+      - '*'   # Triggers on any tag push
 
 jobs:
   build:
