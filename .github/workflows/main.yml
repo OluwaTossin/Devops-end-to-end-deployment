@@ -48,8 +48,11 @@ jobs:
       - name: Build Docker Image
         run: |
           IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
-          echo "🚀 Building Docker Image with tag: $IMAGE_TAG"
+          LATEST_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest
+          
+          echo "🚀 Building Docker Image with tags: $IMAGE_TAG and $LATEST_TAG"
           docker build -t "$IMAGE_TAG" .
+          docker tag "$IMAGE_TAG" "$LATEST_TAG"
 
       - name: Run Trivy Scan Before Pushing
         uses: aquasecurity/trivy-action@0.28.0
@@ -64,8 +67,13 @@ jobs:
       - name: Push Docker Image to AWS ECR
         run: |
           IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
+          LATEST_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest
+          
           echo "📤 Pushing Docker Image: $IMAGE_TAG"
           docker push "$IMAGE_TAG"
+
+          echo "📤 Tagging and Pushing Latest Image: $LATEST_TAG"
+          docker push "$LATEST_TAG"
 
       - name: Check tag version
         run: | 
