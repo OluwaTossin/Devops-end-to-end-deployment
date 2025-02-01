@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - '*'
+  tags:
+    - '*'  # Runs on all tag pushes
 
 jobs:
   build:
@@ -21,10 +21,17 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Set Release version
+      - name: Set Image Tag Version
         id: vars
         run: |
-          echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | tr '/' '-')
+            TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+            echo "RELEASE_VERSION=$BRANCH_NAME-$TIMESTAMP" >> $GITHUB_ENV
+          fi
+          echo "Release Version: ${{ env.RELEASE_VERSION }}"
 
       - name: Authenticate with AWS ECR
         run: |
@@ -33,7 +40,6 @@ jobs:
       - name: Ensure ECR Repository Exists
         run: |
           if ! aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }} >/dev/null 2>&1; then
-            echo "ECR repository does not exist. Creating..."
             aws ecr create-repository --repository-name "${{ secrets.ECR_REPO_NAME }}" --region ${{ secrets.AWS_REGION }}
             echo "ECR repository created successfully!"
           else
@@ -42,7 +48,9 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }} .
+          IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
+          echo "Building Docker Image with tag: $IMAGE_TAG"
+          docker build -t "$IMAGE_TAG" .
 
       - name: Install Trivy
         run: |
@@ -51,15 +59,15 @@ jobs:
 
       - name: Scan Docker Image with Trivy (Log Only, Do Not Fail Build)
         run: |
-          echo "Running security scan, but continuing even if vulnerabilities are found."
-          trivy image ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }} || true
+          echo "Running security scan, logging vulnerabilities but continuing."
+          trivy image --severity CRITICAL,HIGH ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }} || true
 
       - name: Push Docker Image to AWS ECR
         run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
+          IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:${{ env.RELEASE_VERSION }}
+          echo "Pushing Docker Image: $IMAGE_TAG"
+          docker push "$IMAGE_TAG"
 
       - name: Check tag version
         run: | 
-          echo "Release Version: ${{ env.RELEASE_VERSION }}"
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "Final Release Version: ${{ env.RELEASE_VERSION }}"
